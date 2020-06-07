@@ -197,6 +197,17 @@ where
     }
 }
 
+pub fn intern_arc<T: ?Sized>(val: Arc<T>) -> Arc<T>
+where
+    T: Eq + Hash + Ord + Send + Sync + 'static,
+{
+    if std::mem::size_of_val(val.as_ref()) > 1000 {
+        intern_tree_arc(val)
+    } else {
+        intern_hash_arc(val)
+    }
+}
+
 /// Perform internal maintenance (removing otherwise unreferenced elements) and return count of elements
 pub fn num_objects_interned_hash<T: Eq + Hash + ?Sized + 'static>() -> usize {
     if let Some(m) = CONTAINER_HASH
@@ -232,7 +243,7 @@ fn janitor_h<T: Eq + Hash + ?Sized + 'static>(m: &HashContainer<T>) {
     let before = m.hashed.len();
     m.hashed.retain(|k, _v| Arc::strong_count(k) > 1);
     let after = m.hashed.len();
-    let removed = (before - after).max(1);
+    let removed = (before as isize - after as isize).max(1) as usize;
     // assume removals are always possible
     // the interval is tuned such that it is very short for high churn and very long for low churn
     // this is done such that the amortized cost is one retain check per insert

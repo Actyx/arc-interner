@@ -1,5 +1,5 @@
 [package]
-name = "arc-interner"
+name = "intern-arc"
 description = "An interner that deallocates unused values"
 homepage = "https://github.com/ryzhyk/arc-interner"
 version = "0.4.1"
