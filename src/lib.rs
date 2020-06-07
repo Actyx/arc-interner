@@ -214,7 +214,6 @@ pub fn num_objects_interned_hash<T: Eq + Hash + ?Sized + 'static>() -> usize {
         .get()
         .and_then(|type_map| type_map.get(&TypeId::of::<T>()))
     {
-        println!("num_objects_hash {:?}", m.key());
         let m = m.downcast_ref::<HashContainer<T>>().unwrap();
         janitor_h(m);
         m.hashed.len()
@@ -229,13 +228,52 @@ pub fn num_objects_interned_tree<T: Ord + ?Sized + 'static>() -> usize {
         .get()
         .and_then(|type_map| type_map.get(&TypeId::of::<T>()))
     {
-        println!("num_objects_tree {:?}", m.key());
         let m = m.downcast_ref::<TreeContainer<T>>().unwrap();
         let mut s = m.tree.lock().unwrap();
         janitor_t(&mut *s, &m.t_count);
         s.len()
     } else {
         0
+    }
+}
+
+pub fn types_interned() -> (usize, usize) {
+    (
+        CONTAINER_HASH.get().map(|m| m.len()).unwrap_or_default(),
+        CONTAINER_TREE.get().map(|m| m.len()).unwrap_or_default(),
+    )
+}
+
+pub fn inspect_hash<T, F, U>(f: F) -> U
+where
+    T: Eq + Hash + ?Sized + 'static,
+    F: for<'a> FnOnce(Box<dyn Iterator<Item = Arc<T>> + 'a>) -> U,
+{
+    let o = CONTAINER_HASH
+        .get()
+        .and_then(|type_map| type_map.get(&TypeId::of::<T>()));
+    if let Some(r) = o {
+        let m = r.downcast_ref::<HashContainer<T>>().unwrap();
+        f(Box::new(m.hashed.iter().map(|r| r.key().clone())))
+    } else {
+        f(Box::new(std::iter::empty()))
+    }
+}
+
+pub fn inspect_tree<T, F, U>(f: F) -> U
+where
+    T: Ord + ?Sized + 'static,
+    F: for<'a> FnOnce(Box<dyn Iterator<Item = Arc<T>> + 'a>) -> U,
+{
+    let o = CONTAINER_TREE
+        .get()
+        .and_then(|type_map| type_map.get(&TypeId::of::<T>()));
+    if let Some(r) = o {
+        let m = r.downcast_ref::<TreeContainer<T>>().unwrap();
+        let map = m.tree.lock().unwrap();
+        f(Box::new(map.iter().map(|(k, _v)| k.clone())))
+    } else {
+        f(Box::new(std::iter::empty()))
     }
 }
 
